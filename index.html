@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <style>
     :root { --primary:#7e57c2; --light:#b39ddb; --accent:#ff4081; --glass:rgba(255,255,255,.88); }
     body { font-family:'Sarabun',sans-serif; min-height:100vh; color:#444; background:linear-gradient(135deg,#f3e5f5,#e1bee7) fixed; }
@@ -128,7 +129,14 @@
       </div>
       <div class="card card-custom p-4">
         <h5 class="fw-bold mb-3">จุดตรวจทั้งหมด</h5>
-        <div class="table-responsive"><table class="table table-hover align-middle"><tbody id="checkpointTableBody"></tbody></table></div>
+        <form id="checkpointForm" onsubmit="saveCheckpoint(event)" class="row g-3 align-items-end mb-4">
+          <input type="hidden" id="checkpointOriginalCode">
+          <div class="col-md-4"><label class="form-label">รหัสจุดสแกน</label><input id="checkpointCode" class="form-control" placeholder="เช่น CP-001" required></div>
+          <div class="col-md-4"><label class="form-label">ชื่อจุดตรวจ</label><input id="checkpointName" class="form-control" placeholder="เช่น ห้องฉุกเฉิน" required></div>
+          <div class="col-md-2"><label class="form-label">สถานะ</label><select id="checkpointActive" class="form-select"><option value="true">ใช้งาน</option><option value="false">ระงับ</option></select></div>
+          <div class="col-md-2 d-grid"><button class="btn btn-purple"><i class="fas fa-plus me-1"></i>บันทึกจุด</button></div>
+        </form>
+        <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>รหัส</th><th>ชื่อจุดตรวจ</th><th>สถานะ</th><th>QR Code</th><th>จัดการ</th></tr></thead><tbody id="checkpointTableBody"></tbody></table></div>
       </div>
     </section>
 
@@ -137,6 +145,8 @@
       <div class="row justify-content-center"><div class="col-lg-7">
         <div class="card card-custom p-4">
           <h5 class="fw-bold mb-3"><i class="fas fa-clipboard-list me-2"></i>บันทึกเหตุการณ์ประจำจุดตรวจ</h5>
+          <label for="eventCheckpoint" class="form-label fw-bold">จุดตรวจที่เกิดเหตุ</label>
+          <select id="eventCheckpoint" class="form-select mb-3"><option value="">เลือกจุดตรวจ</option></select>
           <label for="damagedDetails" class="form-label fw-bold"><i class="fas fa-screwdriver-wrench me-2 text-danger"></i>แจ้งของชำรุด</label>
           <textarea id="damagedDetails" class="form-control mb-3" rows="2" maxlength="1000" placeholder="ระบุสิ่งของหรืออุปกรณ์ที่ชำรุด และตำแหน่งที่พบ"></textarea>
           <label for="abnormalDetails" class="form-label fw-bold"><i class="fas fa-triangle-exclamation me-2 text-warning"></i>การพบสิ่งผิดปกติตามจุดตรวจ</label>
@@ -146,6 +156,7 @@
           <label for="specialAssistanceDetails" class="form-label fw-bold"><i class="fas fa-hand-holding-medical me-2 text-primary"></i>บันทึกการถูกตามไปช่วยงานพิเศษ</label>
           <textarea id="specialAssistanceDetails" class="form-control" rows="2" maxlength="1000" placeholder="ระบุหน่วยงาน ลักษณะงาน และรายละเอียดการช่วยเหลือ"></textarea>
           <div class="form-text">สามารถเว้นช่องที่ไม่มีเหตุการณ์ได้</div>
+          <button id="btnSaveEvent" type="button" onclick="saveCheckpointEvent()" class="btn btn-success btn-lg w-100 rounded-pill mt-3"><i class="fas fa-floppy-disk me-2"></i>บันทึกเหตุการณ์ประจำจุดตรวจ</button>
         </div>
         <div class="card card-custom p-4">
           <h5 class="fw-bold mb-3"><i class="fas fa-hand-holding-medical me-2"></i>ประเภทการสแกน</h5>
@@ -167,7 +178,7 @@
 
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbz26CecLTY03ht1LRO3mqkz3t5rs5UZwHfOUSTCONwnJVSbZqBoyU5NA7qqXmPQbEK0/exec';
-    let currentUser = null, scanner = null, scanMode = 'checkpoint', scanLocked = false, guardUsersCache = [];
+    let currentUser = null, scanner = null, scanMode = 'checkpoint', scanLocked = false, guardUsersCache = [], checkpointsCache = [];
     const fallbackAgencies = ['ห้องฉุกเฉิน','งานอาคารสถานที่','งานช่าง','งานป้องกันและบรรเทาสาธารณภัย'];
 
     const el = id => document.getElementById(id);
@@ -209,9 +220,10 @@
 
     async function loadAgencies() {
       let agencies=fallbackAgencies;
-      try { const res=await callAPI({action:'getAgencies',token:currentUser?.token}); if(Array.isArray(res.agencies)&&res.agencies.length) agencies=res.agencies; } catch (_) {}
+      try { const res=await callAPI({action:'getAgencies',token:currentUser?.token}); if(Array.isArray(res.agencies)&&res.agencies.length) agencies=res.agencies;if(Array.isArray(res.checkpoints))populateEventCheckpoints(res.checkpoints); } catch (_) {}
       el('agency').innerHTML='<option value="">เลือกหน่วยงานที่ต้องการรับความช่วยเหลือ</option>'+agencies.map(a=>{const name=typeof a==='string'?a:(a.name||'');return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`}).join('');
     }
+    function populateEventCheckpoints(points){checkpointsCache=points.filter(c=>String(c.active).toLowerCase()!=='false');el('eventCheckpoint').innerHTML='<option value="">เลือกจุดตรวจ</option>'+checkpointsCache.map(c=>`<option value="${escapeHtml(c.code)}">${escapeHtml(c.name||c.code)}</option>`).join('');}
 
     function setScanMode(mode) {
       scanMode=mode;
@@ -244,24 +256,35 @@
       finally { scanLocked=false; try { scanner.resume(); } catch (_) {} }
     }
 
+    function eventPayload(){return {token:currentUser.token,username:currentUser.username,guardName:currentUser.name,damagedDetails:el('damagedDetails').value.trim(),abnormalDetails:el('abnormalDetails').value.trim(),eventProblemDetails:el('eventProblemDetails').value.trim(),specialAssistanceDetails:el('specialAssistanceDetails').value.trim()};}
+    function clearEventFields(){['damagedDetails','abnormalDetails','eventProblemDetails','specialAssistanceDetails'].forEach(id=>el(id).value='');}
+    async function saveCheckpointEvent(){
+      const code=el('eventCheckpoint').value,payload=eventPayload();
+      if(!code)return Swal.fire('กรุณาเลือกจุดตรวจ','ต้องระบุจุดที่เกิดเหตุก่อนบันทึก','warning');
+      if(!payload.damagedDetails&&!payload.abnormalDetails&&!payload.eventProblemDetails&&!payload.specialAssistanceDetails)return Swal.fire('ยังไม่มีรายละเอียด','กรุณากรอกเหตุการณ์หรือปัญหาอย่างน้อยหนึ่งช่อง','warning');
+      const button=el('btnSaveEvent');button.disabled=true;
+      try{const res=await callAPI({...payload,action:'saveEvent',code,scannedAt:new Date().toISOString()});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');clearEventFields();await Swal.fire('บันทึกสำเร็จ',`บันทึกเหตุการณ์ที่ ${res.checkpointName||'จุดตรวจ'} แล้ว`,'success');}
+      catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}finally{button.disabled=false;}
+    }
+
     async function loadDashboard() {
       try {
         const res=await callAPI({action:'dashboard',token:currentUser.token});
-        const scans=Array.isArray(res.scans)?res.scans:[];
+        const scans=Array.isArray(res.scans)?res.scans:[], scanRecords=scans.filter(s=>s.scanType!=='event');
         // คำนวณจากรายการสแกนเพื่อแยกเวร หาก API ส่งเฉพาะสรุปรายวันเดิมให้รองรับข้อมูลนั้นด้วย
-        const calculated=calculateDailyDuplicates(scans);
+        const calculated=calculateDailyDuplicates(scanRecords);
         const daily=calculated.length?calculated:normalizeDailyDuplicates(res.dailyDuplicates);
         const today=new Date().toLocaleDateString('en-CA');
         const todayRow=daily.find(r=>String(r.date).slice(0,10)===today)||{};
         el('statToday').textContent=res.todayCount??todayRow.total??0;
         el('statDuplicateToday').textContent=res.duplicateToday??todayRow.duplicates??0;
-        el('statAssistanceToday').textContent=res.assistanceToday??scans.filter(s=>dateKey(s.scannedAt||s.timestamp)===today&&s.scanType==='assistance').length;
+        el('statAssistanceToday').textContent=res.assistanceToday??scanRecords.filter(s=>dateKey(s.scannedAt||s.timestamp)===today&&s.scanType==='assistance').length;
         el('duplicateTableBody').innerHTML=daily.length?daily.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${Number(r.total)||0}</td><td>${formatDuplicatePoints(r.duplicatePoints)}</td><td>${formatNames(r.guardNames)}</td><td>${duplicateBadge(r.morningDuplicates)}</td><td>${duplicateBadge(r.afternoonDuplicates)}</td><td>${duplicateBadge(r.nightDuplicates)}</td><td class="fw-bold text-danger">${Number(r.duplicates)||0}</td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">ยังไม่มีข้อมูลการสแกน</td></tr>';
         const monthly=calculateMonthlyActivities(scans,res.monthlyActivities);
         el('monthlyActivityBody').innerHTML=monthly.length?monthly.map(r=>`<tr><td>${escapeHtml(formatMonth(r.month))}</td><td>${formatNames(r.guardNames)}</td><td><span class="badge text-bg-danger rounded-pill">${r.damaged} ครั้ง</span></td><td><span class="badge text-bg-warning rounded-pill">${r.abnormal} ครั้ง</span></td><td><span class="badge text-bg-info rounded-pill">${r.eventProblems} ครั้ง</span></td><td class="fw-bold">${r.damaged+r.abnormal+r.eventProblems} ครั้ง</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted">ยังไม่มีการแจ้งเหตุ</td></tr>';
-        const checkpoints=Array.isArray(res.checkpoints)?res.checkpoints:[];
-        el('checkpointTableBody').innerHTML=checkpoints.map(c=>`<tr><td>${escapeHtml(c.name||c.code||'-')}</td><td>${escapeHtml(c.lastScan||'-')}</td></tr>`).join('');
-        renderUnscannedByShift(checkpoints,scans,today);
+        const checkpoints=Array.isArray(res.checkpoints)?res.checkpoints:[];checkpointsCache=checkpoints;
+        renderCheckpoints(checkpoints);
+        renderUnscannedByShift(checkpoints,scanRecords,today);
         renderRecentActivities(scans);
         guardUsersCache=Array.isArray(res.guardUsers)?res.guardUsers:[]; renderGuardUsers(guardUsersCache);
       } catch(error) {
@@ -313,6 +336,17 @@
       event.preventDefault();const originalUsername=el('guardUserOriginalUsername').value,username=el('guardUserUsername').value.trim(),password=el('guardUserPassword').value;
       if(!originalUsername&&!password)return Swal.fire('กรุณากำหนดรหัสผ่าน','บัญชีใหม่ต้องมี Password','warning');
       try{const res=await callAPI({action:'saveGuardUser',token:currentUser.token,adminName:currentUser.name,originalUsername,name:el('guardUserName').value.trim(),username,password,active:el('guardUserActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');Swal.fire('บันทึกแล้ว','ตั้งค่าบัญชี รปภ. เรียบร้อย','success');el('guardUserForm').reset();el('guardUserOriginalUsername').value='';loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
+    }
+    function renderCheckpoints(points){el('checkpointTableBody').innerHTML=points.length?points.map((c,i)=>`<tr><td><code>${escapeHtml(c.code)}</code></td><td>${escapeHtml(c.name||c.code)}</td><td>${String(c.active).toLowerCase()!=='false'?'<span class="badge text-bg-success">ใช้งาน</span>':'<span class="badge text-bg-secondary">ระงับ</span>'}</td><td><button class="btn btn-sm btn-outline-dark" onclick="showCheckpointQr(${i})"><i class="fas fa-qrcode me-1"></i>สร้าง QR</button></td><td><button class="btn btn-sm btn-outline-primary" onclick="editCheckpoint(${i})"><i class="fas fa-pen me-1"></i>แก้ไข</button></td></tr>`).join(''):'<tr><td colspan="5" class="text-center text-muted">ยังไม่มีจุดตรวจ กรุณาเพิ่มจุดสแกน</td></tr>';}
+    function editCheckpoint(index){const c=checkpointsCache[index];el('checkpointOriginalCode').value=c.code;el('checkpointCode').value=c.code;el('checkpointName').value=c.name;el('checkpointActive').value=String(c.active).toLowerCase()==='false'?'false':'true';el('checkpointCode').scrollIntoView({behavior:'smooth',block:'center'});}
+    async function saveCheckpoint(event){
+      event.preventDefault();const code=el('checkpointCode').value.trim(),name=el('checkpointName').value.trim();
+      try{const res=await callAPI({action:'saveCheckpoint',token:currentUser.token,originalCode:el('checkpointOriginalCode').value,code,name,active:el('checkpointActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');el('checkpointForm').reset();el('checkpointOriginalCode').value='';await Swal.fire('บันทึกแล้ว',`เพิ่มหรือแก้ไขจุดตรวจ ${name} เรียบร้อย`,'success');loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
+    }
+    function showCheckpointQr(index){
+      const c=checkpointsCache[index];if(typeof QRious==='undefined')return Swal.fire('สร้าง QR ไม่ได้','ไม่สามารถโหลดไลบรารี QR Code ได้ กรุณาตรวจสอบอินเทอร์เน็ต','error');
+      const canvas=document.createElement('canvas');new QRious({element:canvas,value:String(c.code),size:360,level:'H',background:'white',foreground:'black'});const url=canvas.toDataURL('image/png'),fileName=`QR-${String(c.code).replace(/[^a-zA-Z0-9_-]/g,'_')}.png`;
+      Swal.fire({title:escapeHtml(c.name||c.code),html:`<p class="text-muted mb-2">รหัสจุด: <code>${escapeHtml(c.code)}</code></p><img src="${url}" alt="QR Code" class="img-fluid border rounded mb-3" style="max-width:300px"><br><a href="${url}" download="${fileName}" class="btn btn-purple"><i class="fas fa-download me-1"></i>ดาวน์โหลด QR Code</a>`,showConfirmButton:true,confirmButtonText:'ปิด'});
     }
     function dateKey(value){if(!value)return '';const d=new Date(value);return isNaN(d)?String(value).slice(0,10):d.toLocaleDateString('en-CA');}
     function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
