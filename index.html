@@ -128,6 +128,19 @@
         <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>ชื่อ รปภ.</th><th>User</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="guardUsersBody"><tr><td colspan="4" class="text-center text-muted">กำลังโหลด...</td></tr></tbody></table></div>
       </div>
       <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-user-tie me-2"></i>ตั้งค่าบัญชีผู้บริหาร</h5>
+        <form id="adminUserForm" onsubmit="saveAdminUser(event)" class="row g-3 align-items-end mb-4">
+          <input type="hidden" id="adminUserOriginalUsername">
+          <div class="col-md-3"><label class="form-label">ชื่อ-นามสกุล</label><input id="adminUserName" class="form-control" required></div>
+          <div class="col-md-3"><label class="form-label">User</label><input id="adminUserUsername" class="form-control" required autocomplete="off"></div>
+          <div class="col-md-3"><label class="form-label">Password</label><input id="adminUserPassword" type="password" class="form-control" autocomplete="new-password"><div class="form-text">บัญชีใหม่ต้องกรอก Password</div></div>
+          <div class="col-md-2"><label class="form-label">สถานะ</label><select id="adminUserActive" class="form-select"><option value="true">ใช้งาน</option><option value="false">ระงับ</option></select></div>
+          <div class="col-md-1 d-grid"><button class="btn btn-purple px-2" title="บันทึก"><i class="fas fa-save"></i></button></div>
+        </form>
+        <div class="alert alert-warning small"><i class="fas fa-shield-halved me-1"></i>บัญชีผู้บริหารสามารถดูรายงานและจัดการผู้ใช้งานทั้งหมดได้ โปรดกำหนดรหัสผ่านที่คาดเดายาก</div>
+        <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>ชื่อผู้บริหาร</th><th>User</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminUsersBody"><tr><td colspan="4" class="text-center text-muted">กำลังโหลด...</td></tr></tbody></table></div>
+      </div>
+      <div class="card card-custom p-4">
         <h5 class="fw-bold mb-3">จุดตรวจทั้งหมด</h5>
         <form id="checkpointForm" onsubmit="saveCheckpoint(event)" class="row g-3 align-items-end mb-4">
           <input type="hidden" id="checkpointOriginalCode">
@@ -179,6 +192,7 @@
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbz26CecLTY03ht1LRO3mqkz3t5rs5UZwHfOUSTCONwnJVSbZqBoyU5NA7qqXmPQbEK0/exec';
     let currentUser = null, scanner = null, scanMode = 'checkpoint', scanLocked = false, guardUsersCache = [], checkpointsCache = [];
+    let currentUser = null, scanner = null, scanMode = 'checkpoint', scanLocked = false, guardUsersCache = [], adminUsersCache = [], checkpointsCache = [];
     const fallbackAgencies = ['ห้องฉุกเฉิน','งานอาคารสถานที่','งานช่าง','งานป้องกันและบรรเทาสาธารณภัย'];
 
     const el = id => document.getElementById(id);
@@ -287,6 +301,7 @@
         renderUnscannedByShift(checkpoints,scanRecords,today);
         renderRecentActivities(scans);
         guardUsersCache=Array.isArray(res.guardUsers)?res.guardUsers:[]; renderGuardUsers(guardUsersCache);
+        adminUsersCache=Array.isArray(res.adminUsers)?res.adminUsers:[]; renderAdminUsers(adminUsersCache);
       } catch(error) {
         el('statToday').textContent='0'; el('statDuplicateToday').textContent='0'; el('statAssistanceToday').textContent='0';
         el('duplicateTableBody').innerHTML='<tr><td colspan="8" class="text-center text-muted">ยังไม่มีข้อมูลการสแกนสำหรับบัญชีทดสอบ</td></tr>';
@@ -294,6 +309,7 @@
         el('unscannedShiftBody').innerHTML='<tr><td colspan="4" class="text-center text-muted">ยังไม่มีข้อมูลจุดตรวจ</td></tr>';
         el('recentActivityBody').innerHTML='<tr><td colspan="5" class="text-center text-muted">ยังไม่มีข้อมูล</td></tr>';
         el('guardUsersBody').innerHTML='<tr><td colspan="4" class="text-center text-muted">เชื่อมต่อ Google Sheet เพื่อจัดการบัญชี รปภ.</td></tr>';
+        el('adminUsersBody').innerHTML='<tr><td colspan="4" class="text-center text-muted">เชื่อมต่อ Google Sheet เพื่อจัดการบัญชีผู้บริหาร</td></tr>';
         el('checkpointTableBody').innerHTML='<tr><td class="text-center text-muted">ไม่สามารถโหลดข้อมูลจาก API ได้</td></tr>';
         if(!currentUser?.isDemo) Swal.fire('โหลดข้อมูลไม่สำเร็จ',error.message,'error');
       }
@@ -336,6 +352,13 @@
       event.preventDefault();const originalUsername=el('guardUserOriginalUsername').value,username=el('guardUserUsername').value.trim(),password=el('guardUserPassword').value;
       if(!originalUsername&&!password)return Swal.fire('กรุณากำหนดรหัสผ่าน','บัญชีใหม่ต้องมี Password','warning');
       try{const res=await callAPI({action:'saveGuardUser',token:currentUser.token,adminName:currentUser.name,originalUsername,name:el('guardUserName').value.trim(),username,password,active:el('guardUserActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');Swal.fire('บันทึกแล้ว','ตั้งค่าบัญชี รปภ. เรียบร้อย','success');el('guardUserForm').reset();el('guardUserOriginalUsername').value='';loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
+    }
+    function renderAdminUsers(users){el('adminUsersBody').innerHTML=users.length?users.map((u,i)=>`<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.username)}</td><td>${String(u.active).toLowerCase()!=='false'?'<span class="badge text-bg-success">ใช้งาน</span>':'<span class="badge text-bg-secondary">ระงับ</span>'}</td><td><button class="btn btn-sm btn-outline-primary" onclick="editAdminUser(${i})"><i class="fas fa-pen me-1"></i>แก้ไข</button></td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">ยังไม่มีบัญชีผู้บริหาร</td></tr>';}
+    function editAdminUser(index){const u=adminUsersCache[index];el('adminUserOriginalUsername').value=u.username;el('adminUserName').value=u.name;el('adminUserUsername').value=u.username;el('adminUserPassword').value='';el('adminUserActive').value=String(u.active).toLowerCase()==='false'?'false':'true';el('adminUserName').scrollIntoView({behavior:'smooth',block:'center'});}
+    async function saveAdminUser(event){
+      event.preventDefault();const originalUsername=el('adminUserOriginalUsername').value,username=el('adminUserUsername').value.trim(),password=el('adminUserPassword').value;
+      if(!originalUsername&&!password)return Swal.fire('กรุณากำหนดรหัสผ่าน','บัญชีผู้บริหารใหม่ต้องมี Password','warning');
+      try{const res=await callAPI({action:'saveAdminUser',token:currentUser.token,originalUsername,name:el('adminUserName').value.trim(),username,password,active:el('adminUserActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');Swal.fire('บันทึกแล้ว','ตั้งค่าบัญชีผู้บริหารเรียบร้อย','success');el('adminUserForm').reset();el('adminUserOriginalUsername').value='';loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
     }
     function renderCheckpoints(points){el('checkpointTableBody').innerHTML=points.length?points.map((c,i)=>`<tr><td><code>${escapeHtml(c.code)}</code></td><td>${escapeHtml(c.name||c.code)}</td><td>${String(c.active).toLowerCase()!=='false'?'<span class="badge text-bg-success">ใช้งาน</span>':'<span class="badge text-bg-secondary">ระงับ</span>'}</td><td><button class="btn btn-sm btn-outline-dark" onclick="showCheckpointQr(${i})"><i class="fas fa-qrcode me-1"></i>สร้าง QR</button></td><td><button class="btn btn-sm btn-outline-primary" onclick="editCheckpoint(${i})"><i class="fas fa-pen me-1"></i>แก้ไข</button></td></tr>`).join(''):'<tr><td colspan="5" class="text-center text-muted">ยังไม่มีจุดตรวจ กรุณาเพิ่มจุดสแกน</td></tr>';}
     function editCheckpoint(index){const c=checkpointsCache[index];el('checkpointOriginalCode').value=c.code;el('checkpointCode').value=c.code;el('checkpointName').value=c.name;el('checkpointActive').value=String(c.active).toLowerCase()==='false'?'false':'true';el('checkpointCode').scrollIntoView({behavior:'smooth',block:'center'});}
