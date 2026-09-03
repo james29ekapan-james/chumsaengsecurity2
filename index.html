@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chumsaeng Hospital Security</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+  <style>
+    :root { --primary:#7e57c2; --light:#b39ddb; --accent:#ff4081; --glass:rgba(255,255,255,.88); }
+    body { font-family:'Sarabun',sans-serif; min-height:100vh; color:#444; background:linear-gradient(135deg,#f3e5f5,#e1bee7) fixed; }
+    .navbar-custom { background:rgba(126,87,194,.95); box-shadow:0 4px 20px rgba(103,58,183,.2); padding:15px 0; }
+    .navbar-brand { color:#fff!important; font-weight:700; }
+    .card-custom { border:1px solid rgba(255,255,255,.5); border-radius:20px; background:var(--glass); box-shadow:0 8px 32px rgba(31,38,135,.1); margin-bottom:25px; }
+    .form-control,.form-select { border-radius:12px; padding:12px 15px; border:2px solid #e0e0e0; }
+    .btn-purple { color:#fff; border:0; border-radius:50px; padding:12px 30px; font-weight:600; background:linear-gradient(45deg,var(--primary),#9575cd); }
+    .btn-purple:hover { color:#fff; transform:scale(1.01); }
+    .stat-number { font-size:2.7rem; font-weight:700; color:var(--primary); }
+    #reader { width:100%; min-height:300px; background:#000; border-radius:18px; overflow:hidden; border:5px solid #fff; }
+    .login-container { max-width:420px; margin:60px auto; }
+    .hidden { display:none!important; }
+    .scan-mode.active { color:#fff; background:var(--primary); }
+    .required-mark { color:#dc3545; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-custom sticky-top">
+    <div class="container">
+      <a class="navbar-brand" href="#"><i class="fas fa-shield-virus me-2"></i>Chumsaeng Security</a>
+      <div id="userInfo" class="hidden text-white">
+        <span id="currentUserName" class="me-3"></span>
+        <button onclick="logout()" class="btn btn-sm btn-light rounded-pill px-3 fw-bold"><i class="fas fa-sign-out-alt me-1"></i>ออกจากระบบ</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-5">
+    <section id="loginSection" class="login-container">
+      <div class="card card-custom p-4 text-center">
+        <i class="fas fa-user-shield fa-5x mb-3" style="color:#7e57c2"></i>
+        <h3 class="fw-bold mb-4">เลือกประเภทผู้ใช้งาน</h3>
+        <button class="btn btn-purple w-100 btn-lg mb-3" onclick="showLogin('guard')"><i class="fas fa-qrcode me-2"></i>เข้าสู่ระบบ รปภ.</button>
+        <button class="btn btn-outline-secondary w-100 btn-lg rounded-pill" onclick="showLogin('admin')"><i class="fas fa-chart-line me-2"></i>เข้าสู่ระบบผู้บริหาร</button>
+      </div>
+    </section>
+
+    <section id="guardLoginSection" class="login-container hidden">
+      <div class="card card-custom p-4 text-center">
+        <i class="fas fa-person-military-pointing fa-4x mb-3" style="color:#7e57c2"></i>
+        <h3 class="fw-bold mb-1">เข้าสู่ระบบ รปภ.</h3><p class="text-muted mb-4">สำหรับสแกนและบันทึกผลการตรวจ</p>
+        <form onsubmit="handleLogin(event,'guard')" class="text-start">
+          <input id="guardUsername" class="form-control mb-3" placeholder="ชื่อผู้ใช้ รปภ." required>
+          <input type="password" id="guardPassword" class="form-control mb-4" placeholder="รหัสผ่าน" required>
+          <button id="btnGuardLogin" class="btn btn-purple w-100 btn-lg">เข้าสู่หน้าสแกน</button>
+          <div class="alert alert-light border mt-3 mb-0 small text-center">บัญชีทดสอบ: <strong>admin</strong> / <strong>1234</strong></div>
+        </form>
+        <button class="btn btn-link text-secondary mt-2" onclick="showLogin('home')"><i class="fas fa-arrow-left me-1"></i>ย้อนกลับ</button>
+      </div>
+    </section>
+
+    <section id="adminLoginSection" class="login-container hidden">
+      <div class="card card-custom p-4 text-center">
+        <i class="fas fa-user-tie fa-4x mb-3" style="color:#7e57c2"></i>
+        <h3 class="fw-bold mb-1">เข้าสู่ระบบผู้บริหาร</h3><p class="text-muted mb-4">สำหรับดูบทสรุปและรายงาน</p>
+        <form onsubmit="handleLogin(event,'admin')" class="text-start">
+          <input id="adminUsername" class="form-control mb-3" placeholder="ชื่อผู้ใช้ผู้บริหาร" required>
+          <input type="password" id="adminPassword" class="form-control mb-4" placeholder="รหัสผ่าน" required>
+          <button id="btnAdminLogin" class="btn btn-purple w-100 btn-lg">เข้าสู่บทสรุป</button>
+          <div class="alert alert-light border mt-3 mb-0 small text-center">บัญชีทดสอบ: <strong>admin</strong> / <strong>1234</strong></div>
+        </form>
+        <button class="btn btn-link text-secondary mt-2" onclick="showLogin('home')"><i class="fas fa-arrow-left me-1"></i>ย้อนกลับ</button>
+      </div>
+    </section>
+
+    <section id="adminSection" class="hidden">
+      <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+        <h2 class="fw-bold mb-2">บทสรุปผู้บริหาร</h2>
+        <button class="btn btn-outline-secondary rounded-pill" onclick="loadDashboard()"><i class="fas fa-rotate me-1"></i>รีเฟรช</button>
+      </div>
+      <div class="row g-4 mb-4">
+        <div class="col-md-4"><div class="card card-custom p-4 h-100"><h6 class="text-muted">การสแกนวันนี้</h6><div id="statToday" class="stat-number">0</div></div></div>
+        <div class="col-md-4"><div class="card card-custom p-4 h-100"><h6 class="text-muted">สแกนซ้ำจุดเดิมวันนี้</h6><div id="statDuplicateToday" class="stat-number">0</div><small class="text-muted">จำนวนครั้งหลังจากการสแกนครั้งแรกของแต่ละจุด</small></div></div>
+        <div class="col-md-4"><div class="card card-custom p-4 h-100"><h6 class="text-muted">หน่วยงานช่วยเหลือพิเศษวันนี้</h6><div id="statAssistanceToday" class="stat-number">0</div></div></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-route me-2"></i>จุดที่ยังไม่ได้สแกนวันนี้ แยกตามรอบเวร</h5>
+        <div class="table-responsive"><table class="table table-hover align-middle">
+          <thead><tr><th>รอบเวร</th><th>ช่วงเวลา</th><th>จุดที่ยังไม่ได้สแกน</th><th>จำนวน</th></tr></thead>
+          <tbody id="unscannedShiftBody"><tr><td colspan="4" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3">จำนวนสแกนซ้ำจุดเดิมแยกรายวัน</h5>
+        <div class="table-responsive"><table class="table table-hover align-middle">
+          <thead><tr><th>วันที่</th><th>สแกนทั้งหมด</th><th>รายชื่อจุดที่สแกนซ้ำ</th><th>ผู้สแกน</th><th>เวรเช้า<br><small class="fw-normal text-muted">08:00–15:59</small></th><th>เวรบ่าย<br><small class="fw-normal text-muted">16:00–23:59</small></th><th>เวรดึก<br><small class="fw-normal text-muted">00:00–07:59</small></th><th>สแกนซ้ำรวม</th></tr></thead>
+          <tbody id="duplicateTableBody"><tr><td colspan="8" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-calendar-days me-2"></i>บทสรุปกิจกรรมประจำเดือน</h5>
+        <div class="table-responsive"><table class="table table-hover align-middle">
+          <thead><tr><th>เดือน</th><th>ผู้แจ้ง</th><th>แจ้งของชำรุด</th><th>พบสิ่งผิดปกติตามจุดตรวจ</th><th>เหตุการณ์หรือปัญหาที่เกิดขึ้น</th><th>รวมกิจกรรม</th></tr></thead>
+          <tbody id="monthlyActivityBody"><tr><td colspan="6" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-clock-rotate-left me-2"></i>รายการแจ้งเหตุล่าสุด</h5>
+        <div class="table-responsive"><table class="table table-hover align-middle">
+          <thead><tr><th>วันเวลา</th><th>จุดตรวจ</th><th>ผู้แจ้ง/ผู้สแกน</th><th>ประเภท</th><th>รายละเอียด</th></tr></thead>
+          <tbody id="recentActivityBody"><tr><td colspan="5" class="text-center text-muted">กำลังโหลด...</td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-users-gear me-2"></i>ตั้งค่าบัญชีผู้ใช้งาน รปภ.</h5>
+        <form id="guardUserForm" onsubmit="saveGuardUser(event)" class="row g-3 align-items-end mb-4">
+          <input type="hidden" id="guardUserOriginalUsername">
+          <div class="col-md-3"><label class="form-label">ชื่อ-นามสกุล</label><input id="guardUserName" class="form-control" required></div>
+          <div class="col-md-3"><label class="form-label">User</label><input id="guardUserUsername" class="form-control" required autocomplete="off"></div>
+          <div class="col-md-3"><label class="form-label">Password</label><input id="guardUserPassword" type="password" class="form-control" autocomplete="new-password"><div class="form-text">เว้นว่างหากไม่เปลี่ยน</div></div>
+          <div class="col-md-2"><label class="form-label">สถานะ</label><select id="guardUserActive" class="form-select"><option value="true">ใช้งาน</option><option value="false">ระงับ</option></select></div>
+          <div class="col-md-1 d-grid"><button class="btn btn-purple px-2" title="บันทึก"><i class="fas fa-save"></i></button></div>
+        </form>
+        <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>ชื่อ รปภ.</th><th>User</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="guardUsersBody"><tr><td colspan="4" class="text-center text-muted">กำลังโหลด...</td></tr></tbody></table></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3"><i class="fas fa-user-tie me-2"></i>ตั้งค่าบัญชีผู้บริหาร</h5>
+        <form id="adminUserForm" onsubmit="saveAdminUser(event)" class="row g-3 align-items-end mb-4">
+          <input type="hidden" id="adminUserOriginalUsername">
+          <div class="col-md-3"><label class="form-label">ชื่อ-นามสกุล</label><input id="adminUserName" class="form-control" required></div>
+          <div class="col-md-3"><label class="form-label">User</label><input id="adminUserUsername" class="form-control" required autocomplete="off"></div>
+          <div class="col-md-3"><label class="form-label">Password</label><input id="adminUserPassword" type="password" class="form-control" autocomplete="new-password"><div class="form-text">บัญชีใหม่ต้องกรอก Password</div></div>
+          <div class="col-md-2"><label class="form-label">สถานะ</label><select id="adminUserActive" class="form-select"><option value="true">ใช้งาน</option><option value="false">ระงับ</option></select></div>
+          <div class="col-md-1 d-grid"><button class="btn btn-purple px-2" title="บันทึก"><i class="fas fa-save"></i></button></div>
+        </form>
+        <div class="alert alert-warning small"><i class="fas fa-shield-halved me-1"></i>บัญชีผู้บริหารสามารถดูรายงานและจัดการผู้ใช้งานทั้งหมดได้ โปรดกำหนดรหัสผ่านที่คาดเดายาก</div>
+        <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>ชื่อผู้บริหาร</th><th>User</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminUsersBody"><tr><td colspan="4" class="text-center text-muted">กำลังโหลด...</td></tr></tbody></table></div>
+      </div>
+      <div class="card card-custom p-4">
+        <h5 class="fw-bold mb-3">จุดตรวจทั้งหมด</h5>
+        <form id="checkpointForm" onsubmit="saveCheckpoint(event)" class="row g-3 align-items-end mb-4">
+          <input type="hidden" id="checkpointOriginalCode">
+          <div class="col-md-4"><label class="form-label">รหัสจุดสแกน</label><input id="checkpointCode" class="form-control" placeholder="เช่น CP-001" required></div>
+          <div class="col-md-4"><label class="form-label">ชื่อจุดตรวจ</label><input id="checkpointName" class="form-control" placeholder="เช่น ห้องฉุกเฉิน" required></div>
+          <div class="col-md-2"><label class="form-label">สถานะ</label><select id="checkpointActive" class="form-select"><option value="true">ใช้งาน</option><option value="false">ระงับ</option></select></div>
+          <div class="col-md-2 d-grid"><button class="btn btn-purple"><i class="fas fa-plus me-1"></i>บันทึกจุด</button></div>
+        </form>
+        <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>รหัส</th><th>ชื่อจุดตรวจ</th><th>สถานะ</th><th>QR Code</th><th>จัดการ</th></tr></thead><tbody id="checkpointTableBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <section id="guardSection" class="hidden">
+      <h2 class="fw-bold text-center mb-4">ลงเวลาจุดตรวจ</h2>
+      <div class="row justify-content-center"><div class="col-lg-7">
+        <div class="card card-custom p-4">
+          <h5 class="fw-bold mb-3"><i class="fas fa-clipboard-list me-2"></i>บันทึกเหตุการณ์ประจำจุดตรวจ</h5>
+          <label for="eventCheckpoint" class="form-label fw-bold">จุดตรวจที่เกิดเหตุ</label>
+          <select id="eventCheckpoint" class="form-select mb-3"><option value="">เลือกจุดตรวจ</option></select>
+          <label for="damagedDetails" class="form-label fw-bold"><i class="fas fa-screwdriver-wrench me-2 text-danger"></i>แจ้งของชำรุด</label>
+          <textarea id="damagedDetails" class="form-control mb-3" rows="2" maxlength="1000" placeholder="ระบุสิ่งของหรืออุปกรณ์ที่ชำรุด และตำแหน่งที่พบ"></textarea>
+          <label for="abnormalDetails" class="form-label fw-bold"><i class="fas fa-triangle-exclamation me-2 text-warning"></i>การพบสิ่งผิดปกติตามจุดตรวจ</label>
+          <textarea id="abnormalDetails" class="form-control mb-3" rows="2" maxlength="1000" placeholder="ระบุสิ่งผิดปกติ บุคคล เหตุการณ์ หรือตำแหน่งที่พบ"></textarea>
+          <label for="eventProblemDetails" class="form-label fw-bold"><i class="fas fa-file-circle-exclamation me-2 text-info"></i>เหตุการณ์หรือปัญหาที่เกิดขึ้น</label>
+          <textarea id="eventProblemDetails" class="form-control mb-3" rows="2" maxlength="1000" placeholder="บันทึกรายละเอียดเหตุการณ์หรือปัญหาที่เกิดขึ้น และการดำเนินการเบื้องต้น"></textarea>
+          <label for="specialAssistanceDetails" class="form-label fw-bold"><i class="fas fa-hand-holding-medical me-2 text-primary"></i>บันทึกการถูกตามไปช่วยงานพิเศษ</label>
+          <textarea id="specialAssistanceDetails" class="form-control" rows="2" maxlength="1000" placeholder="ระบุหน่วยงาน ลักษณะงาน และรายละเอียดการช่วยเหลือ"></textarea>
+          <div class="form-text">สามารถเว้นช่องที่ไม่มีเหตุการณ์ได้</div>
+          <button id="btnSaveEvent" type="button" onclick="saveCheckpointEvent()" class="btn btn-success btn-lg w-100 rounded-pill mt-3"><i class="fas fa-floppy-disk me-2"></i>บันทึกเหตุการณ์ประจำจุดตรวจ</button>
+        </div>
+        <div class="card card-custom p-4">
+          <h5 class="fw-bold mb-3"><i class="fas fa-hand-holding-medical me-2"></i>ประเภทการสแกน</h5>
+          <div class="btn-group w-100 mb-3" role="group">
+            <button id="modeCheckpoint" type="button" class="btn btn-outline-secondary scan-mode active" onclick="setScanMode('checkpoint')">จุดตรวจ รปภ.</button>
+            <button id="modeAssistance" type="button" class="btn btn-outline-secondary scan-mode" onclick="setScanMode('assistance')">ความช่วยเหลือพิเศษจากหน่วยงาน</button>
+          </div>
+          <div id="agencyFields" class="hidden mb-3">
+            <label for="agency" class="form-label fw-bold">หน่วยงาน <span class="required-mark">*</span></label>
+            <select id="agency" class="form-select"><option value="">เลือกหน่วยงานที่ต้องการรับความช่วยเหลือ</option></select>
+            <div class="form-text">เลือกหน่วยงาน แล้วสแกน QR Code ที่ติดตั้งประจำหน่วยงานนั้น</div>
+          </div>
+          <div id="reader"></div>
+          <button id="btnStartScan" onclick="startScanner()" class="btn btn-purple btn-lg w-100 mt-3"><i class="fas fa-camera me-2"></i>เปิดกล้องเพื่อสแกน</button>
+        </div>
+      </div></div>
+    </section>
+  </main>
+
+  <script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbz26CecLTY03ht1LRO3mqkz3t5rs5UZwHfOUSTCONwnJVSbZqBoyU5NA7qqXmPQbEK0/exec';
+    let currentUser = null, scanner = null, scanMode = 'checkpoint', scanLocked = false, guardUsersCache = [], adminUsersCache = [], checkpointsCache = [];
+    const fallbackAgencies = ['ห้องฉุกเฉิน','งานอาคารสถานที่','งานช่าง','งานป้องกันและบรรเทาสาธารณภัย'];
+
+    const el = id => document.getElementById(id);
+    async function callAPI(data) {
+      const response = await fetch(API_URL,{method:'POST',body:JSON.stringify(data)});
+      if (!response.ok) throw new Error('ไม่สามารถเชื่อมต่อระบบได้');
+      return response.json();
+    }
+
+    function showLogin(type) {
+      ['loginSection','guardLoginSection','adminLoginSection'].forEach(id=>el(id).classList.add('hidden'));
+      el(type==='guard'?'guardLoginSection':type==='admin'?'adminLoginSection':'loginSection').classList.remove('hidden');
+    }
+
+    async function handleLogin(event, expectedRole) {
+      event.preventDefault();
+      const prefix=expectedRole==='admin'?'admin':'guard';
+      const username=el(prefix+'Username').value.trim();
+      const password=el(prefix+'Password').value.trim();
+      const button=el(expectedRole==='admin'?'btnAdminLogin':'btnGuardLogin'); button.disabled=true; button.textContent='กำลังเข้าสู่ระบบ...';
+      try {
+        // บัญชีสำหรับทดสอบหน้า Dashboard โดยไม่ขึ้นกับการตั้งค่าผู้ใช้ใน API
+        let res;
+        res=await callAPI({action:'login',username,password,requestedRole:expectedRole});
+        if (res.status!=='success') throw new Error(res.message||'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        const actualRole=res.role==='admin'?'admin':'guard';
+        if(actualRole!==expectedRole) throw new Error(expectedRole==='admin'?'บัญชีนี้ไม่ใช่บัญชีผู้บริหาร':'บัญชีนี้ไม่ใช่บัญชี รปภ.');
+        currentUser={role:res.role,name:res.name,username:res.username||username,token:res.token||'',isDemo:!!res.isDemo};
+        ['loginSection','guardLoginSection','adminLoginSection'].forEach(id=>el(id).classList.add('hidden'));
+        el('userInfo').classList.remove('hidden'); el('currentUserName').textContent=res.name||'';
+        if(res.role==='admin'){el('adminSection').classList.remove('hidden');loadDashboard();}
+        else {el('guardSection').classList.remove('hidden');loadAgencies();}
+      } catch(error) { Swal.fire('เข้าสู่ระบบไม่สำเร็จ',error.message,'error'); }
+      finally { button.disabled=false; button.textContent=expectedRole==='admin'?'เข้าสู่บทสรุป':'เข้าสู่หน้าสแกน'; }
+    }
+
+    async function loadAgencies() {
+      let agencies=fallbackAgencies;
+      try { const res=await callAPI({action:'getAgencies',token:currentUser?.token}); if(Array.isArray(res.agencies)&&res.agencies.length) agencies=res.agencies;if(Array.isArray(res.checkpoints))populateEventCheckpoints(res.checkpoints); } catch (_) {}
+      el('agency').innerHTML='<option value="">เลือกหน่วยงานที่ต้องการรับความช่วยเหลือ</option>'+agencies.map(a=>{const name=typeof a==='string'?a:(a.name||'');return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`}).join('');
+    }
+    function populateEventCheckpoints(points){checkpointsCache=points.filter(c=>String(c.active).toLowerCase()!=='false');el('eventCheckpoint').innerHTML='<option value="">เลือกจุดตรวจ</option>'+checkpointsCache.map(c=>`<option value="${escapeHtml(c.code)}">${escapeHtml(c.name||c.code)}</option>`).join('');}
+
+    function setScanMode(mode) {
+      scanMode=mode;
+      el('modeCheckpoint').classList.toggle('active',mode==='checkpoint');
+      el('modeAssistance').classList.toggle('active',mode==='assistance');
+      el('agencyFields').classList.toggle('hidden',mode!=='assistance');
+    }
+
+    async function startScanner() {
+      if(location.protocol!=='https:'&&location.hostname!=='localhost') return Swal.fire('เปิดกล้องไม่ได้','ระบบสแกนต้องทำงานผ่าน HTTPS','error');
+      if(scanMode==='assistance'&&!el('agency').value) return Swal.fire('กรุณาเลือกหน่วยงาน','ต้องเลือกหน่วยงานก่อนสแกน QR Code','warning');
+      if(scanner) return;
+      scanner=new Html5Qrcode('reader'); el('btnStartScan').disabled=true;
+      try {
+        await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250}},onScanSuccess,()=>{});
+      } catch(error) { scanner=null; el('btnStartScan').disabled=false; Swal.fire('เปิดกล้องไม่ได้','โปรดอนุญาตสิทธิ์กล้องและใช้ Chrome หรือ Safari','error'); }
+    }
+
+    async function onScanSuccess(decodedText) {
+      if(scanLocked) return; scanLocked=true;
+      try { await scanner.pause(true); } catch (_) {}
+      try {
+        const damagedDetails=el('damagedDetails').value.trim(), abnormalDetails=el('abnormalDetails').value.trim(), eventProblemDetails=el('eventProblemDetails').value.trim(), specialAssistanceDetails=el('specialAssistanceDetails').value.trim();
+        const payload={action:'scan',token:currentUser.token,username:currentUser.username,code:decodedText,guardName:currentUser.name,scanType:scanMode,agency:scanMode==='assistance'?el('agency').value:'',damagedDetails,abnormalDetails,eventProblemDetails,specialAssistanceDetails,issueDetails:[damagedDetails,abnormalDetails,eventProblemDetails,specialAssistanceDetails].filter(Boolean).join(' | '),scannedAt:new Date().toISOString()};
+        const res=await callAPI(payload);
+        if(res.status&&res.status!=='success') throw new Error(res.message||'บันทึกไม่สำเร็จ');
+        await Swal.fire('บันทึกสำเร็จ',scanMode==='assistance'?`บันทึกการช่วยเหลือจาก ${payload.agency} แล้ว`:'บันทึกการตรวจจุดแล้ว','success');
+        ['damagedDetails','abnormalDetails','eventProblemDetails','specialAssistanceDetails'].forEach(id=>el(id).value='');
+      } catch(error) { await Swal.fire('บันทึกไม่สำเร็จ',error.message,'error'); }
+      finally { scanLocked=false; try { scanner.resume(); } catch (_) {} }
+    }
+
+    function eventPayload(){return {token:currentUser.token,username:currentUser.username,guardName:currentUser.name,damagedDetails:el('damagedDetails').value.trim(),abnormalDetails:el('abnormalDetails').value.trim(),eventProblemDetails:el('eventProblemDetails').value.trim(),specialAssistanceDetails:el('specialAssistanceDetails').value.trim()};}
+    function clearEventFields(){['damagedDetails','abnormalDetails','eventProblemDetails','specialAssistanceDetails'].forEach(id=>el(id).value='');}
+    async function saveCheckpointEvent(){
+      const code=el('eventCheckpoint').value,payload=eventPayload();
+      if(!code)return Swal.fire('กรุณาเลือกจุดตรวจ','ต้องระบุจุดที่เกิดเหตุก่อนบันทึก','warning');
+      if(!payload.damagedDetails&&!payload.abnormalDetails&&!payload.eventProblemDetails&&!payload.specialAssistanceDetails)return Swal.fire('ยังไม่มีรายละเอียด','กรุณากรอกเหตุการณ์หรือปัญหาอย่างน้อยหนึ่งช่อง','warning');
+      const button=el('btnSaveEvent');button.disabled=true;
+      try{const res=await callAPI({...payload,action:'saveEvent',code,scannedAt:new Date().toISOString()});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');clearEventFields();await Swal.fire('บันทึกสำเร็จ',`บันทึกเหตุการณ์ที่ ${res.checkpointName||'จุดตรวจ'} แล้ว`,'success');}
+      catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}finally{button.disabled=false;}
+    }
+
+    async function loadDashboard() {
+      try {
+        const res=await callAPI({action:'dashboard',token:currentUser.token});
+        const scans=Array.isArray(res.scans)?res.scans:[], scanRecords=scans.filter(s=>s.scanType!=='event');
+        // คำนวณจากรายการสแกนเพื่อแยกเวร หาก API ส่งเฉพาะสรุปรายวันเดิมให้รองรับข้อมูลนั้นด้วย
+        const calculated=calculateDailyDuplicates(scanRecords);
+        const daily=calculated.length?calculated:normalizeDailyDuplicates(res.dailyDuplicates);
+        const today=new Date().toLocaleDateString('en-CA');
+        const todayRow=daily.find(r=>String(r.date).slice(0,10)===today)||{};
+        el('statToday').textContent=res.todayCount??todayRow.total??0;
+        el('statDuplicateToday').textContent=res.duplicateToday??todayRow.duplicates??0;
+        el('statAssistanceToday').textContent=res.assistanceToday??scanRecords.filter(s=>dateKey(s.scannedAt||s.timestamp)===today&&s.scanType==='assistance').length;
+        el('duplicateTableBody').innerHTML=daily.length?daily.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${Number(r.total)||0}</td><td>${formatDuplicatePoints(r.duplicatePoints)}</td><td>${formatNames(r.guardNames)}</td><td>${duplicateBadge(r.morningDuplicates)}</td><td>${duplicateBadge(r.afternoonDuplicates)}</td><td>${duplicateBadge(r.nightDuplicates)}</td><td class="fw-bold text-danger">${Number(r.duplicates)||0}</td></tr>`).join(''):'<tr><td colspan="8" class="text-center text-muted">ยังไม่มีข้อมูลการสแกน</td></tr>';
+        const monthly=calculateMonthlyActivities(scans,res.monthlyActivities);
+        el('monthlyActivityBody').innerHTML=monthly.length?monthly.map(r=>`<tr><td>${escapeHtml(formatMonth(r.month))}</td><td>${formatNames(r.guardNames)}</td><td><span class="badge text-bg-danger rounded-pill">${r.damaged} ครั้ง</span></td><td><span class="badge text-bg-warning rounded-pill">${r.abnormal} ครั้ง</span></td><td><span class="badge text-bg-info rounded-pill">${r.eventProblems} ครั้ง</span></td><td class="fw-bold">${r.damaged+r.abnormal+r.eventProblems} ครั้ง</td></tr>`).join(''):'<tr><td colspan="6" class="text-center text-muted">ยังไม่มีการแจ้งเหตุ</td></tr>';
+        const checkpoints=Array.isArray(res.checkpoints)?res.checkpoints:[];checkpointsCache=checkpoints;
+        renderCheckpoints(checkpoints);
+        renderUnscannedByShift(checkpoints,scanRecords,today);
+        renderRecentActivities(scans);
+        guardUsersCache=Array.isArray(res.guardUsers)?res.guardUsers:[]; renderGuardUsers(guardUsersCache);
+        adminUsersCache=Array.isArray(res.adminUsers)?res.adminUsers:[]; renderAdminUsers(adminUsersCache);
+      } catch(error) {
+        el('statToday').textContent='0'; el('statDuplicateToday').textContent='0'; el('statAssistanceToday').textContent='0';
+        el('duplicateTableBody').innerHTML='<tr><td colspan="8" class="text-center text-muted">ยังไม่มีข้อมูลการสแกนสำหรับบัญชีทดสอบ</td></tr>';
+        el('monthlyActivityBody').innerHTML='<tr><td colspan="6" class="text-center text-muted">ยังไม่มีข้อมูลกิจกรรม</td></tr>';
+        el('unscannedShiftBody').innerHTML='<tr><td colspan="4" class="text-center text-muted">ยังไม่มีข้อมูลจุดตรวจ</td></tr>';
+        el('recentActivityBody').innerHTML='<tr><td colspan="5" class="text-center text-muted">ยังไม่มีข้อมูล</td></tr>';
+        el('guardUsersBody').innerHTML='<tr><td colspan="4" class="text-center text-muted">เชื่อมต่อ Google Sheet เพื่อจัดการบัญชี รปภ.</td></tr>';
+        el('adminUsersBody').innerHTML='<tr><td colspan="4" class="text-center text-muted">เชื่อมต่อ Google Sheet เพื่อจัดการบัญชีผู้บริหาร</td></tr>';
+        el('checkpointTableBody').innerHTML='<tr><td class="text-center text-muted">ไม่สามารถโหลดข้อมูลจาก API ได้</td></tr>';
+        if(!currentUser?.isDemo) Swal.fire('โหลดข้อมูลไม่สำเร็จ',error.message,'error');
+      }
+    }
+
+    function calculateDailyDuplicates(scans) {
+      const days={};
+      scans.forEach(s=>{
+        const value=s.scannedAt||s.timestamp, date=dateKey(value); if(!date)return;
+        const code=String(s.code||s.checkpointCode||'ไม่ระบุจุด'), name=String(s.checkpointName||s.pointName||s.location||code), shift=getShift(value);
+        days[date]??={date,total:0,duplicates:0,morningDuplicates:0,afternoonDuplicates:0,nightDuplicates:0,codes:{morning:{},afternoon:{},night:{}},pointNames:{},guardNames:{}};
+        const row=days[date], bucket=row.codes[shift]; row.total++; bucket[code]=(bucket[code]||0)+1;
+        if(bucket[code]>1){row.duplicates++;row[shift+'Duplicates']++;row.pointNames[name]=(row.pointNames[name]||0)+1;row.guardNames[s.guardName||s.username||'ไม่ระบุผู้ใช้']=true;}
+      });
+      return Object.values(days).sort((a,b)=>b.date.localeCompare(a.date)).map(({codes,pointNames,guardNames,...row})=>({...row,duplicatePoints:Object.entries(pointNames).map(([name,count])=>({name,count})),guardNames:Object.keys(guardNames)}));
+    }
+    function getShift(value){const d=new Date(value),hour=isNaN(d)?Number(String(value).slice(11,13)):d.getHours();return hour>=8&&hour<16?'morning':hour>=16?'afternoon':'night';}
+    function normalizeDailyDuplicates(rows){return Array.isArray(rows)?rows.map(r=>({date:r.date,total:Number(r.total)||0,morningDuplicates:Number(r.morningDuplicates??r.morning)||0,afternoonDuplicates:Number(r.afternoonDuplicates??r.afternoon)||0,nightDuplicates:Number(r.nightDuplicates??r.night)||0,duplicates:Number(r.duplicates)||((Number(r.morningDuplicates??r.morning)||0)+(Number(r.afternoonDuplicates??r.afternoon)||0)+(Number(r.nightDuplicates??r.night)||0)),duplicatePoints:r.duplicatePoints||r.pointNames||[],guardNames:r.guardNames||[]})):[];}
+    function duplicateBadge(value){const n=Number(value)||0;return n?`<span class="badge text-bg-danger rounded-pill">${n} ครั้ง</span>`:'<span class="text-muted">0</span>';}
+    function formatDuplicatePoints(points){if(!points||(Array.isArray(points)&&!points.length))return '<span class="text-muted">ไม่มี</span>';const list=Array.isArray(points)?points:Object.entries(points).map(([name,count])=>({name,count}));return list.map(p=>`<div><i class="fas fa-location-dot me-1 text-danger"></i>${escapeHtml(typeof p==='string'?p:p.name)}${typeof p==='object'&&p.count?` <small class="text-muted">(${p.count} ครั้ง)</small>`:''}</div>`).join('');}
+    function calculateMonthlyActivities(scans,fallback){
+      if(!scans.length&&Array.isArray(fallback))return fallback.map(r=>({month:r.month,damaged:Number(r.damaged??r.damagedCount)||0,abnormal:Number(r.abnormal??r.abnormalCount)||0,eventProblems:Number(r.eventProblems??r.eventProblemCount)||0,guardNames:r.guardNames||[]}));
+      const months={}; scans.forEach(s=>{const date=dateKey(s.scannedAt||s.timestamp);if(!date)return;const month=date.slice(0,7);months[month]??={month,damaged:0,abnormal:0,eventProblems:0,names:{}};let has=false;if(String(s.damagedDetails||s.damageDetails||'').trim()){months[month].damaged++;has=true;}if(String(s.abnormalDetails||s.abnormalityDetails||'').trim()){months[month].abnormal++;has=true;}if(String(s.eventProblemDetails||s.eventDetails||'').trim()){months[month].eventProblems++;has=true;}if(has)months[month].names[s.guardName||s.username||'ไม่ระบุผู้ใช้']=true;});return Object.values(months).sort((a,b)=>b.month.localeCompare(a.month)).map(({names,...r})=>({...r,guardNames:Object.keys(names)}));
+    }
+    function formatMonth(value){const [year,month]=String(value).split('-').map(Number);if(!year||!month)return value;return new Intl.DateTimeFormat('th-TH',{month:'long',year:'numeric'}).format(new Date(year,month-1,1));}
+    function formatNames(names){return Array.isArray(names)&&names.length?names.map(n=>`<span class="badge text-bg-light border me-1 mb-1"><i class="fas fa-user me-1"></i>${escapeHtml(n)}</span>`).join(''):'<span class="text-muted">ไม่ระบุ</span>';}
+    function renderUnscannedByShift(checkpoints,scans,today){
+      const active=checkpoints.filter(c=>c.active!==false&&String(c.active).toLowerCase()!=='false');
+      const shifts=[['morning','เวรเช้า','08:00–15:59'],['afternoon','เวรบ่าย','16:00–23:59'],['night','เวรดึก','00:00–07:59']];
+      el('unscannedShiftBody').innerHTML=shifts.map(([key,label,time])=>{const scanned=new Set(scans.filter(s=>dateKey(s.scannedAt||s.timestamp)===today&&getShift(s.scannedAt||s.timestamp)===key).map(s=>String(s.code||s.checkpointCode)));const missing=active.filter(c=>!scanned.has(String(c.code||c.checkpointCode))).map(c=>c.name||c.code);return `<tr><td class="fw-bold">${label}</td><td>${time}</td><td>${missing.length?missing.map(n=>`<span class="badge text-bg-secondary me-1 mb-1">${escapeHtml(n)}</span>`).join(''):'<span class="text-success"><i class="fas fa-circle-check me-1"></i>สแกนครบแล้ว</span>'}</td><td>${missing.length}</td></tr>`;}).join('');
+    }
+    function renderRecentActivities(scans){
+      const rows=scans.filter(s=>s.damagedDetails||s.abnormalDetails||s.eventProblemDetails||s.specialAssistanceDetails).sort((a,b)=>new Date(b.scannedAt||b.timestamp)-new Date(a.scannedAt||a.timestamp)).slice(0,50);
+      el('recentActivityBody').innerHTML=rows.length?rows.map(s=>{const items=[];if(s.damagedDetails)items.push(['ของชำรุด',s.damagedDetails]);if(s.abnormalDetails)items.push(['สิ่งผิดปกติ',s.abnormalDetails]);if(s.eventProblemDetails)items.push(['เหตุการณ์/ปัญหา',s.eventProblemDetails]);if(s.specialAssistanceDetails)items.push(['ช่วยงานพิเศษ',s.specialAssistanceDetails]);return items.map(([type,detail],i)=>`<tr><td>${i?'':escapeHtml(formatDateTime(s.scannedAt||s.timestamp))}</td><td>${i?'':escapeHtml(s.checkpointName||s.pointName||s.code||'-')}</td><td>${i?'':escapeHtml(s.guardName||s.username||'ไม่ระบุ')}</td><td>${escapeHtml(type)}</td><td>${escapeHtml(detail)}</td></tr>`).join('');}).join(''):'<tr><td colspan="5" class="text-center text-muted">ยังไม่มีรายการแจ้งเหตุ</td></tr>';
+    }
+    function formatDateTime(value){const d=new Date(value);return isNaN(d)?String(value||'-'):new Intl.DateTimeFormat('th-TH',{dateStyle:'short',timeStyle:'short'}).format(d);}
+    function renderGuardUsers(users){el('guardUsersBody').innerHTML=users.length?users.map((u,i)=>`<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.username)}</td><td>${String(u.active).toLowerCase()!=='false'?'<span class="badge text-bg-success">ใช้งาน</span>':'<span class="badge text-bg-secondary">ระงับ</span>'}</td><td><button class="btn btn-sm btn-outline-primary" onclick="editGuardUser(${i})"><i class="fas fa-pen me-1"></i>แก้ไข</button></td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">ยังไม่มีบัญชี รปภ.</td></tr>';}
+    function editGuardUser(index){const u=guardUsersCache[index];el('guardUserOriginalUsername').value=u.username;el('guardUserName').value=u.name;el('guardUserUsername').value=u.username;el('guardUserPassword').value='';el('guardUserActive').value=String(u.active).toLowerCase()==='false'?'false':'true';el('guardUserName').scrollIntoView({behavior:'smooth',block:'center'});}
+    async function saveGuardUser(event){
+      event.preventDefault();const originalUsername=el('guardUserOriginalUsername').value,username=el('guardUserUsername').value.trim(),password=el('guardUserPassword').value;
+      if(!originalUsername&&!password)return Swal.fire('กรุณากำหนดรหัสผ่าน','บัญชีใหม่ต้องมี Password','warning');
+      try{const res=await callAPI({action:'saveGuardUser',token:currentUser.token,adminName:currentUser.name,originalUsername,name:el('guardUserName').value.trim(),username,password,active:el('guardUserActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');Swal.fire('บันทึกแล้ว','ตั้งค่าบัญชี รปภ. เรียบร้อย','success');el('guardUserForm').reset();el('guardUserOriginalUsername').value='';loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
+    }
+    function renderAdminUsers(users){el('adminUsersBody').innerHTML=users.length?users.map((u,i)=>`<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.username)}</td><td>${String(u.active).toLowerCase()!=='false'?'<span class="badge text-bg-success">ใช้งาน</span>':'<span class="badge text-bg-secondary">ระงับ</span>'}</td><td><button class="btn btn-sm btn-outline-primary" onclick="editAdminUser(${i})"><i class="fas fa-pen me-1"></i>แก้ไข</button></td></tr>`).join(''):'<tr><td colspan="4" class="text-center text-muted">ยังไม่มีบัญชีผู้บริหาร</td></tr>';}
+    function editAdminUser(index){const u=adminUsersCache[index];el('adminUserOriginalUsername').value=u.username;el('adminUserName').value=u.name;el('adminUserUsername').value=u.username;el('adminUserPassword').value='';el('adminUserActive').value=String(u.active).toLowerCase()==='false'?'false':'true';el('adminUserName').scrollIntoView({behavior:'smooth',block:'center'});}
+    async function saveAdminUser(event){
+      event.preventDefault();const originalUsername=el('adminUserOriginalUsername').value,username=el('adminUserUsername').value.trim(),password=el('adminUserPassword').value;
+      if(!originalUsername&&!password)return Swal.fire('กรุณากำหนดรหัสผ่าน','บัญชีผู้บริหารใหม่ต้องมี Password','warning');
+      try{const res=await callAPI({action:'saveAdminUser',token:currentUser.token,originalUsername,name:el('adminUserName').value.trim(),username,password,active:el('adminUserActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');Swal.fire('บันทึกแล้ว','ตั้งค่าบัญชีผู้บริหารเรียบร้อย','success');el('adminUserForm').reset();el('adminUserOriginalUsername').value='';loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
+    }
+    function renderCheckpoints(points){el('checkpointTableBody').innerHTML=points.length?points.map((c,i)=>`<tr><td><code>${escapeHtml(c.code)}</code></td><td>${escapeHtml(c.name||c.code)}</td><td>${String(c.active).toLowerCase()!=='false'?'<span class="badge text-bg-success">ใช้งาน</span>':'<span class="badge text-bg-secondary">ระงับ</span>'}</td><td><button class="btn btn-sm btn-outline-dark" onclick="showCheckpointQr(${i})"><i class="fas fa-qrcode me-1"></i>สร้าง QR</button></td><td><button class="btn btn-sm btn-outline-primary" onclick="editCheckpoint(${i})"><i class="fas fa-pen me-1"></i>แก้ไข</button></td></tr>`).join(''):'<tr><td colspan="5" class="text-center text-muted">ยังไม่มีจุดตรวจ กรุณาเพิ่มจุดสแกน</td></tr>';}
+    function editCheckpoint(index){const c=checkpointsCache[index];el('checkpointOriginalCode').value=c.code;el('checkpointCode').value=c.code;el('checkpointName').value=c.name;el('checkpointActive').value=String(c.active).toLowerCase()==='false'?'false':'true';el('checkpointCode').scrollIntoView({behavior:'smooth',block:'center'});}
+    async function saveCheckpoint(event){
+      event.preventDefault();const code=el('checkpointCode').value.trim(),name=el('checkpointName').value.trim();
+      try{const res=await callAPI({action:'saveCheckpoint',token:currentUser.token,originalCode:el('checkpointOriginalCode').value,code,name,active:el('checkpointActive').value==='true'});if(res.status!=='success')throw new Error(res.message||'บันทึกไม่สำเร็จ');el('checkpointForm').reset();el('checkpointOriginalCode').value='';await Swal.fire('บันทึกแล้ว',`เพิ่มหรือแก้ไขจุดตรวจ ${name} เรียบร้อย`,'success');loadDashboard();}catch(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');}
+    }
+    function showCheckpointQr(index){
+      const c=checkpointsCache[index];if(typeof QRious==='undefined')return Swal.fire('สร้าง QR ไม่ได้','ไม่สามารถโหลดไลบรารี QR Code ได้ กรุณาตรวจสอบอินเทอร์เน็ต','error');
+      const canvas=document.createElement('canvas');new QRious({element:canvas,value:String(c.code),size:360,level:'H',background:'white',foreground:'black'});const url=canvas.toDataURL('image/png'),fileName=`QR-${String(c.code).replace(/[^a-zA-Z0-9_-]/g,'_')}.png`;
+      Swal.fire({title:escapeHtml(c.name||c.code),html:`<p class="text-muted mb-2">รหัสจุด: <code>${escapeHtml(c.code)}</code></p><img src="${url}" alt="QR Code" class="img-fluid border rounded mb-3" style="max-width:300px"><br><a href="${url}" download="${fileName}" class="btn btn-purple"><i class="fas fa-download me-1"></i>ดาวน์โหลด QR Code</a>`,showConfirmButton:true,confirmButtonText:'ปิด'});
+    }
+    function dateKey(value){if(!value)return '';const d=new Date(value);return isNaN(d)?String(value).slice(0,10):d.toLocaleDateString('en-CA');}
+    function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));}
+    async function stopScanner(){if(scanner){try{await scanner.stop();scanner.clear();}catch(_){}scanner=null;}}
+    async function logout(){await stopScanner();currentUser=null;el('adminSection').classList.add('hidden');el('guardSection').classList.add('hidden');el('userInfo').classList.add('hidden');showLogin('home');}
+  </script>
+</body>
+</html>
